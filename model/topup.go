@@ -25,20 +25,22 @@ type TopUp struct {
 }
 
 const (
-	PaymentMethodStripe       = "stripe"
-	PaymentMethodCreem        = "creem"
-	PaymentMethodWaffo        = "waffo"
-	PaymentMethodWaffoPancake = "waffo_pancake"
-	PaymentMethodBalance      = "balance"
+	PaymentMethodStripe        = "stripe"
+	PaymentMethodCreem         = "creem"
+	PaymentMethodWaffo         = "waffo"
+	PaymentMethodWaffoPancake  = "waffo_pancake"
+	PaymentMethodBalance       = "balance"
+	PaymentMethodMiniappWechat = "wechatmini_jsapi"
 )
 
 const (
-	PaymentProviderEpay         = "epay"
-	PaymentProviderStripe       = "stripe"
-	PaymentProviderCreem        = "creem"
-	PaymentProviderWaffo        = "waffo"
-	PaymentProviderWaffoPancake = "waffo_pancake"
-	PaymentProviderBalance      = "balance"
+	PaymentProviderEpay          = "epay"
+	PaymentProviderStripe        = "stripe"
+	PaymentProviderCreem         = "creem"
+	PaymentProviderWaffo         = "waffo"
+	PaymentProviderWaffoPancake  = "waffo_pancake"
+	PaymentProviderBalance       = "balance"
+	PaymentProviderMiniappWechat = "wechatmini"
 )
 
 var (
@@ -204,6 +206,34 @@ func GetUserTopUps(userId int, pageInfo *common.PageInfo) (topups []*TopUp, tota
 }
 
 // GetAllTopUps 获取全平台的充值记录（管理员使用，不限制时间窗口）
+func GetUserTopUpsAllTime(userId int, pageInfo *common.PageInfo) (topups []*TopUp, total int64, err error) {
+	tx := DB.Begin()
+	if tx.Error != nil {
+		return nil, 0, tx.Error
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	if err = tx.Model(&TopUp{}).Where("user_id = ?", userId).Count(&total).Error; err != nil {
+		tx.Rollback()
+		return nil, 0, err
+	}
+
+	if err = tx.Where("user_id = ?", userId).Order("id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Find(&topups).Error; err != nil {
+		tx.Rollback()
+		return nil, 0, err
+	}
+
+	if err = tx.Commit().Error; err != nil {
+		return nil, 0, err
+	}
+
+	return topups, total, nil
+}
+
 func GetAllTopUps(pageInfo *common.PageInfo) (topups []*TopUp, total int64, err error) {
 	tx := DB.Begin()
 	if tx.Error != nil {

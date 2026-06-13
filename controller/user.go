@@ -459,6 +459,7 @@ func GetSelf(c *gin.Context) {
 		"discord_id":        user.DiscordId,
 		"oidc_id":           user.OidcId,
 		"wechat_id":         user.WeChatId,
+		"wechat_openid":     user.WeChatOpenID,
 		"telegram_id":       user.TelegramId,
 		"group":             user.Group,
 		"quota":             user.Quota,
