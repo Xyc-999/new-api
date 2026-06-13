@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 
@@ -126,7 +125,7 @@ func respondWechatMiniLoginSuccess(c *gin.Context, user *model.User, created boo
 }
 
 func WechatMiniLogin(c *gin.Context) {
-	if os.Getenv("WECHAT_MINI_ENABLED") != "true" {
+	if !common.WeChatAuthEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "管理员未开启通过微信小程序登录以及注册",
 			"success": false,
@@ -204,7 +203,7 @@ func WechatMiniLogin(c *gin.Context) {
 }
 
 func WechatMiniCreateAccount(c *gin.Context) {
-	if os.Getenv("WECHAT_MINI_ENABLED") != "true" {
+	if !common.WeChatAuthEnabled {
 		respondWechatMiniAuthError(c, "管理员未开启通过微信小程序登录以及注册")
 		return
 	}
@@ -256,7 +255,7 @@ func WechatMiniCreateAccount(c *gin.Context) {
 }
 
 func WechatMiniBindExisting(c *gin.Context) {
-	if os.Getenv("WECHAT_MINI_ENABLED") != "true" {
+	if !common.WeChatAuthEnabled {
 		respondWechatMiniAuthError(c, "管理员未开启通过微信小程序登录以及注册")
 		return
 	}

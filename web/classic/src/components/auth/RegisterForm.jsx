@@ -177,6 +177,10 @@ const RegisterForm = () => {
   }, []);
 
   const onWeChatLoginClicked = () => {
+    if (/\/api\/wechat\/web\/authorize(?:\?|$)/.test(status.wechat_qrcode || '')) {
+      window.location.href = status.wechat_qrcode;
+      return;
+    }
     setWechatLoading(true);
     setShowWeChatLoginModal(true);
     setWechatLoading(false);

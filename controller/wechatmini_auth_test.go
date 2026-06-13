@@ -40,11 +40,14 @@ func setupWechatMiniAuthTest(t *testing.T) *gin.Engine {
 
 	originalRegisterEnabled := common.RegisterEnabled
 	originalQuotaForNewUser := common.QuotaForNewUser
+	originalWeChatAuthEnabled := common.WeChatAuthEnabled
 	common.RegisterEnabled = true
 	common.QuotaForNewUser = 0
+	common.WeChatAuthEnabled = true
 	t.Cleanup(func() {
 		common.RegisterEnabled = originalRegisterEnabled
 		common.QuotaForNewUser = originalQuotaForNewUser
+		common.WeChatAuthEnabled = originalWeChatAuthEnabled
 	})
 
 	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
@@ -71,8 +74,6 @@ func setupWechatMiniAuthTest(t *testing.T) *gin.Engine {
 	t.Cleanup(func() {
 		SetWechatMiniFetchCode2SessionForTest(originalFetch)
 	})
-
-	t.Setenv("WECHAT_MINI_ENABLED", "true")
 
 	engine := gin.New()
 	wechatMiniRoute := engine.Group("/wechatmini")
@@ -189,6 +190,19 @@ func TestWechatMiniLoginReturnsBindOrCreateWithoutPendingToken(t *testing.T) {
 	}
 	if countWechatMiniUsers(t) != 0 {
 		t.Fatalf("expected no users to be created for unbound wechat, got %d", countWechatMiniUsers(t))
+	}
+}
+
+func TestWechatMiniLoginUsesWeChatAuthEnabledSwitch(t *testing.T) {
+	engine := setupWechatMiniAuthTest(t)
+	common.WeChatAuthEnabled = false
+
+	response := decodeWechatMiniAPIResponse(t, performWechatMiniJSONRequest(t, engine, http.MethodPost, "/wechatmini/auth/login", map[string]string{"code": "wx-unbound"}))
+	if response.Success {
+		t.Fatal("expected login to be disabled when WeChatAuthEnabled is false")
+	}
+	if response.Message != "管理员未开启通过微信小程序登录以及注册" {
+		t.Fatalf("expected disabled message, got %q", response.Message)
 	}
 }
 

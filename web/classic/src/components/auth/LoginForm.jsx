@@ -177,6 +177,10 @@ const LoginForm = () => {
       showInfo(t('请先阅读并同意用户协议和隐私政策'));
       return;
     }
+    if (/\/api\/wechat\/web\/authorize(?:\?|$)/.test(status.wechat_qrcode || '')) {
+      window.location.href = status.wechat_qrcode;
+      return;
+    }
     setWechatLoading(true);
     setShowWeChatLoginModal(true);
     setWechatLoading(false);

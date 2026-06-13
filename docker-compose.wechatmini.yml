@@ -1,0 +1,121 @@
+# New-API WeChatMini integrated deployment.
+#
+# Usage:
+#   1. cp .env.wechatmini.example .env.wechatmini
+#   2. Edit .env.wechatmini and replace all secrets.
+#   3. docker compose --env-file .env.wechatmini -f docker-compose.wechatmini.yml up -d --build
+#
+# This compose file is intentionally separate from the upstream docker-compose.yml
+# so our mini-program additions do not conflict with upstream deployment files.
+
+services:
+  new-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.wechatmini
+    image: new-api-wechatmini:local
+    container_name: new-api-wechatmini
+    restart: always
+    command: --log-dir /app/logs
+    ports:
+      - "${NEW_API_PORT:-3000}:3000"
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+      - ./certs:/certs:ro
+    environment:
+      - SQL_DSN=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:-123456}@postgres:5432/${POSTGRES_DB:-new-api}
+      - REDIS_CONN_STRING=redis://:${REDIS_PASSWORD:-123456}@redis:6379
+      - TZ=${TZ:-Asia/Shanghai}
+      - ERROR_LOG_ENABLED=${ERROR_LOG_ENABLED:-true}
+      - BATCH_UPDATE_ENABLED=${BATCH_UPDATE_ENABLED:-true}
+      - NODE_NAME=${NODE_NAME:-new-api-wechatmini-node-1}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - WECHAT_MINI_PAY_ENABLED=${WECHAT_MINI_PAY_ENABLED:-false}
+      - WECHAT_APPID=${WECHAT_MINI_APPID}
+      - WECHAT_APP_SECRET=${WECHAT_MINI_APP_SECRET}
+      - WECHAT_PAY_MCH_ID=${WECHAT_PAY_MCH_ID}
+      - WECHAT_PAY_MCH_SERIAL_NO=${WECHAT_PAY_MCH_SERIAL_NO}
+      - WECHAT_PAY_PRIVATE_KEY=${WECHAT_PAY_PRIVATE_KEY}
+      - WECHAT_PAY_NOTIFY_URL=${WECHAT_PAY_NOTIFY_URL}
+      - WECHAT_PAY_API_V3_KEY=${WECHAT_PAY_API_V3_KEY}
+      - WECHAT_PAY_PLATFORM_CERT_PATH=${WECHAT_PAY_PLATFORM_CERT_PATH:-/certs/wechat_platform_cert.pem}
+    depends_on:
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      wechat-login:
+        condition: service_healthy
+    networks:
+      - new-api-wechatmini-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/status | grep -o '\"success\":\\s*true' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  wechat-login:
+    build:
+      context: .
+      dockerfile: Dockerfile.wechatmini
+    image: new-api-wechatmini:local
+    container_name: new-api-wechat-login
+    restart: always
+    entrypoint: ["/wechat-login"]
+    expose:
+      - "8090"
+    # If your reverse proxy is outside this compose network, publish this port
+    # and proxy /api/wechat/web/* to the wechat-login service.
+    # ports:
+    #   - "${WECHAT_LOGIN_PUBLIC_PORT:-8090}:8090"
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+      - WECHAT_LOGIN_SERVER_PORT=8090
+      - WECHAT_LOGIN_SERVER_TOKEN=${WECHAT_LOGIN_SERVER_TOKEN}
+      - WECHAT_WEB_APPID=${WECHAT_WEB_APPID}
+      - WECHAT_WEB_APP_SECRET=${WECHAT_WEB_APP_SECRET}
+      - WECHAT_WEB_CALLBACK_URL=${WECHAT_WEB_CALLBACK_URL}
+      - WECHAT_WEB_FRONTEND_OAUTH_URL=${WECHAT_WEB_FRONTEND_OAUTH_URL}
+      - WECHAT_MINI_APPID=${WECHAT_MINI_APPID}
+      - WECHAT_MINI_APP_SECRET=${WECHAT_MINI_APP_SECRET}
+    networks:
+      - new-api-wechatmini-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8090/health | grep -o '\"success\":\\s*true' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:latest
+    container_name: new-api-wechatmini-redis
+    restart: always
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-123456}"]
+    networks:
+      - new-api-wechatmini-network
+
+  postgres:
+    image: postgres:15
+    container_name: new-api-wechatmini-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-123456}
+      POSTGRES_DB: ${POSTGRES_DB:-new-api}
+    volumes:
+      - wechatmini_pg_data:/var/lib/postgresql/data
+    networks:
+      - new-api-wechatmini-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-root} -d ${POSTGRES_DB:-new-api}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  wechatmini_pg_data:
+
+networks:
+  new-api-wechatmini-network:
+    driver: bridge

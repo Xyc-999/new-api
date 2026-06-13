@@ -141,6 +141,10 @@ export function UserAuthForm({
       ''
     )
   }, [status])
+  const isWeChatAuthorizeUrl = useMemo(() => {
+    if (!wechatQrCodeUrl) return false
+    return /\/api\/wechat\/web\/authorize(?:\?|$)/.test(wechatQrCodeUrl)
+  }, [wechatQrCodeUrl])
 
   async function onSubmit(data: z.infer<typeof loginFormSchema>) {
     if (requiresLegalConsent && !agreedToLegal) {
@@ -177,6 +181,11 @@ export function UserAuthForm({
   const handleOpenWeChatDialog = () => {
     if (requiresLegalConsent && !agreedToLegal) {
       toast.error(legalConsentErrorMessage)
+      return
+    }
+
+    if (isWeChatAuthorizeUrl) {
+      window.location.href = wechatQrCodeUrl
       return
     }
 

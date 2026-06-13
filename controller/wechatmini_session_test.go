@@ -1,35 +1,25 @@
 package controller
 
 import (
-	"context"
-	"errors"
-	"net/http"
+	"strings"
 	"testing"
+
+	"github.com/QuantumNous/new-api/common"
 )
 
-type roundTripperFunc func(*http.Request) (*http.Response, error)
-
-func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return fn(req)
-}
-
-func TestFetchWechatMiniCode2SessionSetsRequestTimeout(t *testing.T) {
-	originalTransport := http.DefaultTransport
-	http.DefaultTransport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-		if _, ok := req.Context().Deadline(); !ok {
-			return nil, errors.New("missing deadline")
-		}
-		return nil, context.DeadlineExceeded
-	})
+func TestFetchWechatMiniCode2SessionRequiresWechatLoginServer(t *testing.T) {
+	originalAddress := common.WeChatServerAddress
+	originalToken := common.WeChatServerToken
 	t.Cleanup(func() {
-		http.DefaultTransport = originalTransport
+		common.WeChatServerAddress = originalAddress
+		common.WeChatServerToken = originalToken
 	})
 
-	t.Setenv("WECHAT_APPID", "test-appid")
-	t.Setenv("WECHAT_APP_SECRET", "test-secret")
+	common.WeChatServerAddress = ""
+	common.WeChatServerToken = ""
 
 	_, err := fetchWechatMiniCode2Session("wx-code")
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("expected deadline exceeded error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "微信登录服务未配置") {
+		t.Fatalf("expected missing wechat login server error, got %v", err)
 	}
 }
