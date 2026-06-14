@@ -203,6 +203,10 @@ func WechatMiniLogin(c *gin.Context) {
 }
 
 func WechatMiniCreateAccount(c *gin.Context) {
+	if !common.RegisterEnabled {
+		respondWechatMiniAuthError(c, "管理员未开启通过微信小程序登录以及注册")
+		return
+	}
 	if !common.WeChatAuthEnabled {
 		respondWechatMiniAuthError(c, "管理员未开启通过微信小程序登录以及注册")
 		return
