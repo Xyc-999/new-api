@@ -24,16 +24,15 @@ COPY ./web/default/dist ./web/default/dist
 COPY ./web/classic/dist ./web/classic/dist
 # ==================================
 
-RUN go build -p 1 -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o new-api
-RUN go build -p 1 -ldflags "-s -w" -o wechat-login ./cmd/wechat-login
+RUN go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o new-api
+RUN go build -ldflags "-s -w" -o wechat-login ./cmd/wechat-login
 
 FROM debian:bookworm-slim
 
 RUN echo "deb http://mirrors.aliyun.com/debian bookworm main contrib non-free" > /etc/apt/sources.list \
     && echo "deb http://mirrors.aliyun.com/debian bookworm-updates main contrib non-free" >> /etc/apt/sources.list \
-    && echo "deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list
-
-RUN apt-get update \
+    && echo "deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free" >> /etc/apt/sources.list \
+    && apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates tzdata libasan8 wget \
     && rm -rf /var/lib/apt/lists/* \
     && update-ca-certificates
