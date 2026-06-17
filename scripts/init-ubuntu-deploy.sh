@@ -85,7 +85,7 @@ install_docker() {
       "max-size": "10m"
     }
   }
-  EOF
+EOF
 
   # 重载配置、重启、开机自启
   systemctl daemon-reload
