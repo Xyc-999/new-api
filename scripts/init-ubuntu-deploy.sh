@@ -42,48 +42,63 @@ install_base_packages() {
 }
 
 install_docker() {
-  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-    log "Docker and docker compose plugin already installed."
-    return
-  fi
+  echo "==================== 使用阿里云国内源安装Docker ===================="
 
-  log "Installing Docker Engine from Docker apt repository..."
-  ${SUDO} install -m 0755 -d /etc/apt/keyrings
-  if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | ${SUDO} gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    ${SUDO} chmod a+r /etc/apt/keyrings/docker.gpg
-  fi
+  # 1. 清理旧版docker
+  echo "卸载系统旧Docker组件"
+  apt remove -y docker docker-engine docker.io containerd runc || true
 
-  local arch
-  local codename
-  arch="$(dpkg --print-architecture)"
-  codename="$(
-    . /etc/os-release
-    printf '%s' "${VERSION_CODENAME:-}"
-  )"
-  if [ -z "$codename" ]; then
-    codename="$(lsb_release -cs)"
-  fi
+  # 2. 安装依赖
+  echo "[1/5] 安装依赖 ca-certificates curl gnupg lsb-release"
+  apt update
+  apt install -y ca-certificates curl gnupg lsb-release
 
-  printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu %s stable\n' "$arch" "$codename" \
-    | ${SUDO} tee /etc/apt/sources.list.d/docker.list >/dev/null
+  # 3. 导入阿里云Docker GPG密钥（公网地址mirrors.aliyun.com）
+  echo "[2/5] 拉取阿里云Docker签名密钥"
+  install -m 0755 -d /etc/apt/keyrings
+  # 阿里云公网GPG地址
+  curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  chmod a+r /etc/apt/keyrings/docker.gpg
 
-  ${SUDO} apt-get update
-  ${SUDO} env DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    docker-ce \
-    docker-ce-cli \
-    containerd.io \
-    docker-buildx-plugin \
-    docker-compose-plugin
+  # 4. 添加阿里云Docker CE软件源
+  echo "[3/5] 写入阿里云Docker apt源"
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://mirrors.aliyun.com/docker-ce/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-  if command -v systemctl >/dev/null 2>&1; then
-    ${SUDO} systemctl enable --now docker
-  fi
+  # 5. 更新源并安装全套docker
+  echo "[4/5] 安装 docker-ce + compose插件"
+  apt update
+  apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
-  if [ -n "${SUDO_USER:-}" ] && [ "${SUDO_USER}" != "root" ]; then
-    ${SUDO} usermod -aG docker "$SUDO_USER" || true
-    log "User ${SUDO_USER} was added to the docker group. Re-login later to use docker without sudo."
-  fi
+  # 6. 配置国内镜像加速器（阿里云+多备用镜像）
+  echo "[5/5] 配置容器镜像加速"
+  tee /etc/docker/daemon.json <<-'EOF'
+  {
+    "registry-mirrors": [
+      "https://docker.1ms.run",
+      "https://hub-mirror.c.163.com"
+    ],
+    "features": {
+      "buildkit": true
+    },
+    "log-driver": "json-file",
+    "log-opts": {
+      "max-size": "10m"
+    }
+  }
+  EOF
+
+  # 重载配置、重启、开机自启
+  systemctl daemon-reload
+  systemctl restart docker
+  systemctl enable --now docker
+
+  # 输出校验信息
+  echo -e "\n==================== 安装完成 ===================="
+  docker --version
+  docker compose version
+  echo -e "\n测试拉取hello-world验证："
+  docker run --rm hello-world
+
 }
 
 setup_nginx_ssl() {
