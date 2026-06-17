@@ -55,16 +55,12 @@ install_docker() {
 
   # 3. 导入阿里云Docker GPG密钥（公网地址mirrors.aliyun.com）
   echo "[2/5] 拉取阿里云Docker签名密钥"
-  # 删除旧源避免官方源残留报错
-  ${SUDO} rm -f /etc/apt/sources.list.d/docker.list
-  ${SUDO} install -m 0755 -d /etc/apt/keyrings
-  # 下载阿里云GPG
-  if ! curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | ${SUDO} gpg --dearmor -o /etc/apt/keyrings/docker.gpg; then
-    echo "ERROR: 下载GPG密钥失败"
-    return 1
-  fi
-  # 权限改为644，apt可正常读取校验
-  ${SUDO} chmod 644 /etc/apt/keyrings/docker.gpg
+  echo "[2/5] 清理旧Docker源、拉取阿里云Docker签名密钥"
+  # 关键：删除残留的官方docker源文件，杜绝download.docker.com出现
+  rm -f /etc/apt/sources.list.d/docker.list
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  chmod 644 /etc/apt/keyrings/docker.gpg
 
   # 4. 添加阿里云Docker CE软件源
   echo "[3/5] 写入阿里云Docker apt源"
